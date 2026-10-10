@@ -1,3 +1,4 @@
+import { apiFetch } from "./api";
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   LineChart,
@@ -138,7 +139,7 @@ export default function App() {
   // 3. Metadata Dataset Principal
   useEffect(() => {
     if (!datasetSel) return;
-    fetch(`/api/metadata?dataset=${datasetSel}`)
+    apiFetch(`/api/metadata?dataset=${datasetSel}`)
       .then((res) => (res.ok ? res.blob().then(b => b.text()).then(t => JSON.parse(t)) : { regiones: [], indicadores: [] }))
       .then((data) => {
         const regs: string[] = data.regiones || [];
