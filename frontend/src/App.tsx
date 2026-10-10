@@ -125,7 +125,7 @@ export default function App() {
 
   // 2. Cargar Datasets
   useEffect(() => {
-    fetch('/api/, { headers: { 'x-observatorio-token': 'obs_front_prod_9921_sec' }, }datasets')
+    fetch('/api/datasets', { headers: { 'x-observatorio-token': 'obs_front_prod_9921_sec' } })
       .then((res) => (res.ok ? res.blob().then(b => b.text()).then(t => JSON.parse(t)) : []))
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
