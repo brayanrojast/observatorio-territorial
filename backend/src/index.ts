@@ -2,24 +2,47 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
-import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
 const app = express();
 
-// Patrón singleton para Prisma en entornos Serverless
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
-export const prisma = globalForPrisma.prisma || new PrismaClient({
-  log: ['error'],
-});
+export const prisma = globalForPrisma.prisma || new PrismaClient({ log: ['error'] });
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+
+// Clave simétrica fija para cifrado de payloads (AES-256)
+const SECRET_KEY = Buffer.from('8f4a9b2c1d3e5f7a0b2c4d6e8f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d3e5f7a', 'hex');
+
+function encryptPayload(data: any): { secure_payload: string; iv: string } {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-cbc', SECRET_KEY, iv);
+  let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'base64');
+  encrypted += cipher.final('base64');
+  return {
+    secure_payload: encrypted,
+    iv: iv.toString('hex')
+  };
+}
+
+// Detector preventivo de Inyección SQL para parámetros libres
+const sqlInjectionPattern = /(\b(SELECT|UNION|INSERT|DELETE|UPDATE|DROP|ALTER|EXEC|TRUNCATE)\b|--|\/\*|\*\/|;)/i;
+
+const safeString = z.string().trim().min(1).max(100).refine((val) => !sqlInjectionPattern.test(val), {
+  message: 'Parámetro inválido o sospechoso detectado',
+});
+
+// Middleware que intercepta respuestas y las cifra para la pestaña Network
+function sendSecure(res: Response, data: any) {
+  res.json(encryptPayload(data));
+}
 
 app.get('/api/datasets', async (_req: Request, res: Response) => {
   try {
@@ -27,25 +50,20 @@ app.get('/api/datasets', async (_req: Request, res: Response) => {
       distinct: ['dataset'],
       select: { dataset: true },
     });
-    res.json(datasets.map((d) => d.dataset));
-  } catch (error: any) {
-    console.error('Error en /api/datasets:', error?.message || error);
-    res.status(500).json({ error: 'Error al consultar datasets', detalle: error?.message });
+    sendSecure(res, datasets.map((d) => d.dataset));
+  } catch (error) {
+    res.status(500).json({ error: 'Servicio no disponible' });
   }
 });
 
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // Máximo 100 peticiones por ventana por IP (mitiga scrapers masivos)
-  message: { error: 'Límite de solicitudes alcanzado. Intente más tarde.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api/', apiLimiter);
-
 app.get('/api/metadata', async (req: Request, res: Response) => {
   try {
-    const dataset = String(req.query.dataset || 'empleo_geih');
+    const datasetParse = safeString.safeParse(req.query.dataset || 'empleo_geih');
+    if (!datasetParse.success) {
+      return res.status(400).json({ error: 'Parámetros no permitidos' });
+    }
+    const dataset = datasetParse.data;
+
     const regiones = await prisma.datosEconomicos.findMany({
       where: { dataset },
       distinct: ['region'],
@@ -58,28 +76,27 @@ app.get('/api/metadata', async (req: Request, res: Response) => {
       select: { indicador: true, unidad: true },
       orderBy: { indicador: 'asc' },
     });
-    res.json({
+    sendSecure(res, {
       regiones: regiones.map((r) => r.region),
       indicadores,
     });
-  } catch (error: any) {
-    console.error('Error en /api/metadata:', error?.message || error);
-    res.status(500).json({ error: 'Error al consultar metadata', detalle: error?.message });
+  } catch (error) {
+    res.status(500).json({ error: 'Servicio no disponible' });
   }
 });
 
 const DatosQuerySchema = z.object({
-  dataset: z.string().min(1),
-  region: z.string().min(1),
-  indicador: z.string().min(1),
-  anio_inicio: z.string().optional(),
-  anio_fin: z.string().optional(),
+  dataset: safeString,
+  region: safeString,
+  indicador: safeString,
+  anio_inicio: z.string().regex(/^\d{4}$/).optional(),
+  anio_fin: z.string().regex(/^\d{4}$/).optional(),
 });
 
 app.get('/api/datos', async (req: Request, res: Response) => {
   const parseResult = DatosQuerySchema.safeParse(req.query);
   if (!parseResult.success) {
-    return res.status(400).json({ error: 'Parámetros inválidos' });
+    return res.status(400).json({ error: 'Parámetros de consulta no permitidos' });
   }
   const { dataset, region, indicador, anio_inicio, anio_fin } = parseResult.data;
 
@@ -96,51 +113,37 @@ app.get('/api/datos', async (req: Request, res: Response) => {
       select: { anio: true, valor: true, unidad: true },
       orderBy: { anio: 'asc' },
     });
-    res.json(datos);
-  } catch (error: any) {
-    console.error('Error en /api/datos:', error?.message || error);
-    res.status(500).json({ error: 'Error al consultar datos', detalle: error?.message });
+    sendSecure(res, datos);
+  } catch (error) {
+    res.status(500).json({ error: 'Servicio no disponible' });
   }
 });
 
-app.use(cors({
-  origin: ['https://obster.carlosgfajardo.com', 'https://observatorio-territorial-c6jj.vercel.app']
-}));
+const FichaQuerySchema = z.object({
+  dataset: safeString.default('empleo_geih'),
+  region: safeString,
+  anio: z.string().regex(/^\d{4}$/).default('2023'),
+});
 
 app.get('/api/departamento/ficha', async (req: Request, res: Response) => {
-  const dataset = String(req.query.dataset || 'empleo_geih');
-  const region = String(req.query.region || '');
-  const anio = parseInt(String(req.query.anio || '2023'), 10);
+  const parseResult = FichaQuerySchema.safeParse(req.query);
+  if (!parseResult.success) {
+    return res.status(400).json({ error: 'Parámetros inválidos' });
+  }
 
-  if (!region) return res.status(400).json({ error: 'Falta la región' });
+  const { dataset, region, anio } = parseResult.data;
+  const anioNum = parseInt(anio, 10);
 
   try {
     const indicadoresAnio = await prisma.datosEconomicos.findMany({
-      where: { dataset, region, anio },
+      where: { dataset, region, anio: anioNum },
       select: { indicador: true, valor: true, unidad: true },
       orderBy: { indicador: 'asc' },
     });
-    res.json({ region, anio, dataset, indicadores: indicadoresAnio });
-  } catch (error: any) {
-    console.error('Error en /api/departamento/ficha:', error?.message || error);
-    res.status(500).json({ error: 'Error al consultar ficha', detalle: error?.message });
+    sendSecure(res, { region, anio: anioNum, dataset, indicadores: indicadoresAnio });
+  } catch (error) {
+    res.status(500).json({ error: 'Servicio no disponible' });
   }
 });
-
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'"],
-      },
-    },
-    frameguard: { action: 'deny' }, // Nadie puede meter tu web en un iframe
-    noSniff: true,
-  })
-);
 
 export default app;
