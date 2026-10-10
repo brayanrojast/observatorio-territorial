@@ -47,7 +47,7 @@
           debugger;
           const despues = performance.now();
           if (despues - antes > 100) {
-            document.body.innerHTML = "<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#0f172a;color:#fff;"><h2>Acceso de depuración bloqueado por seguridad.</h2></div>";
+            document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#0f172a;color:#fff;"><h2>Acceso de depuración bloqueado por seguridad.</h2></div>`;
           }
         }, 800);
       })();
