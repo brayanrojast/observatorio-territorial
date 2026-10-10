@@ -5,6 +5,5 @@ export default defineConfig({
   plugins: [react()],
   build: {
     sourcemap: false,
-    minify: 'esbuild',
   },
 });
