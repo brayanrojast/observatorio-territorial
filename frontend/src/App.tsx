@@ -124,7 +124,7 @@ export default function App() {
 
   // 2. Cargar Datasets
   useEffect(() => {
-    fetch('http://localhost:4000/api/datasets')
+    fetch('/api/datasets')
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
@@ -138,7 +138,7 @@ export default function App() {
   // 3. Metadata Dataset Principal
   useEffect(() => {
     if (!datasetSel) return;
-    fetch(`http://localhost:4000/api/metadata?dataset=${datasetSel}`)
+    fetch(`/api/metadata?dataset=${datasetSel}`)
       .then((res) => (res.ok ? res.json() : { regiones: [], indicadores: [] }))
       .then((data) => {
         const regs: string[] = data.regiones || [];
@@ -170,7 +170,7 @@ export default function App() {
       return cacheConsultas.current.get(key)!;
     }
     try {
-      const url = `http://localhost:4000/api/datos?dataset=${dataset}&region=${encodeURIComponent(region)}&indicador=${encodeURIComponent(indicador)}`;
+      const url = `/api/datos?dataset=${dataset}&region=${encodeURIComponent(region)}&indicador=${encodeURIComponent(indicador)}`;
       const res = await fetch(url);
       if (!res.ok) return [];
       const data: SerieItem[] = await res.json();
@@ -343,7 +343,7 @@ export default function App() {
     setLoadingFicha(true);
     try {
       const res = await fetch(
-        `http://localhost:4000/api/departamento/ficha?dataset=${datasetSel}&region=${encodeURIComponent(nombreDepto)}&anio=${anioMapa}`
+        `/api/departamento/ficha?dataset=${datasetSel}&region=${encodeURIComponent(nombreDepto)}&anio=${anioMapa}`
       );
       if (!res.ok) throw new Error('Error backend');
       const data: FichaData = await res.json();
