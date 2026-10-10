@@ -2,7 +2,6 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 
@@ -18,49 +17,32 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-// Clave simétrica fija para cifrado de payloads (AES-256)
-const SECRET_KEY = Buffer.from('8f4a9b2c1d3e5f7a0b2c4d6e8f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d3e5f7a', 'hex');
-
-function encryptPayload(data: any): { secure_payload: string; iv: string } {
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv('aes-256-cbc', SECRET_KEY, iv);
-  let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'base64');
-  encrypted += cipher.final('base64');
-  return {
-    secure_payload: encrypted,
-    iv: iv.toString('hex')
-  };
-}
-
-// Detector preventivo de Inyección SQL para parámetros libres
+// Filtro anti inyección SQL estricto
 const sqlInjectionPattern = /(\b(SELECT|UNION|INSERT|DELETE|UPDATE|DROP|ALTER|EXEC|TRUNCATE)\b|--|\/\*|\*\/|;)/i;
 
 const safeString = z.string().trim().min(1).max(100).refine((val) => !sqlInjectionPattern.test(val), {
-  message: 'Parámetro inválido o sospechoso detectado',
+  message: 'Parámetro sospechoso detectado',
 });
 
-// Middleware que intercepta respuestas y las cifra para la pestaña Network
-function sendSecure(res: Response, data: any) {
-  res.json(encryptPayload(data));
-}
-
+// 1. Datasets
 app.get('/api/datasets', async (_req: Request, res: Response) => {
   try {
     const datasets = await prisma.datosEconomicos.findMany({
       distinct: ['dataset'],
       select: { dataset: true },
     });
-    sendSecure(res, datasets.map((d) => d.dataset));
+    res.json(datasets.map((d) => d.dataset));
   } catch (error) {
     res.status(500).json({ error: 'Servicio no disponible' });
   }
 });
 
+// 2. Metadata
 app.get('/api/metadata', async (req: Request, res: Response) => {
   try {
     const datasetParse = safeString.safeParse(req.query.dataset || 'empleo_geih');
     if (!datasetParse.success) {
-      return res.status(400).json({ error: 'Parámetros no permitidos' });
+      return res.status(400).json({ error: 'Parámetros inválidos' });
     }
     const dataset = datasetParse.data;
 
@@ -76,7 +58,7 @@ app.get('/api/metadata', async (req: Request, res: Response) => {
       select: { indicador: true, unidad: true },
       orderBy: { indicador: 'asc' },
     });
-    sendSecure(res, {
+    res.json({
       regiones: regiones.map((r) => r.region),
       indicadores,
     });
@@ -85,6 +67,7 @@ app.get('/api/metadata', async (req: Request, res: Response) => {
   }
 });
 
+// 3. Datos
 const DatosQuerySchema = z.object({
   dataset: safeString,
   region: safeString,
@@ -96,7 +79,7 @@ const DatosQuerySchema = z.object({
 app.get('/api/datos', async (req: Request, res: Response) => {
   const parseResult = DatosQuerySchema.safeParse(req.query);
   if (!parseResult.success) {
-    return res.status(400).json({ error: 'Parámetros de consulta no permitidos' });
+    return res.status(400).json({ error: 'Parámetros no permitidos' });
   }
   const { dataset, region, indicador, anio_inicio, anio_fin } = parseResult.data;
 
@@ -113,12 +96,13 @@ app.get('/api/datos', async (req: Request, res: Response) => {
       select: { anio: true, valor: true, unidad: true },
       orderBy: { anio: 'asc' },
     });
-    sendSecure(res, datos);
+    res.json(datos);
   } catch (error) {
     res.status(500).json({ error: 'Servicio no disponible' });
   }
 });
 
+// 4. Ficha Departamental
 const FichaQuerySchema = z.object({
   dataset: safeString.default('empleo_geih'),
   region: safeString,
@@ -140,7 +124,7 @@ app.get('/api/departamento/ficha', async (req: Request, res: Response) => {
       select: { indicador: true, valor: true, unidad: true },
       orderBy: { indicador: 'asc' },
     });
-    sendSecure(res, { region, anio: anioNum, dataset, indicadores: indicadoresAnio });
+    res.json({ region, anio: anioNum, dataset, indicadores: indicadoresAnio });
   } catch (error) {
     res.status(500).json({ error: 'Servicio no disponible' });
   }

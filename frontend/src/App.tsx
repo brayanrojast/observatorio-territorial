@@ -1,4 +1,3 @@
-import { decryptResponse } from "./cryptoClient";
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   LineChart,
