@@ -5,6 +5,54 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>
+  
+    <!-- Blindaje de consola y clic derecho -->
+    <script>
+      (function() {
+        // 1. Bloquear clic derecho
+        document.addEventListener("contextmenu", function(e) {
+          e.preventDefault();
+          return false;
+        }, { capture: true });
+
+        // 2. Bloquear atajos de teclado inspeccion / source
+        document.addEventListener("keydown", function(e) {
+          // F12
+          if (e.keyCode === 123) {
+            e.preventDefault();
+            return false;
+          }
+          // Ctrl+Shift+I / Cmd+Option+I (Inspector)
+          // Ctrl+Shift+J / Cmd+Option+J (Consola)
+          // Ctrl+Shift+C / Cmd+Option+C (Inspeccionar elemento)
+          if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "I" || e.key === "i" || e.key === "J" || e.key === "j" || e.key === "C" || e.key === "c")) {
+            e.preventDefault();
+            return false;
+          }
+          // Ctrl+U / Cmd+U (View Source)
+          if ((e.ctrlKey || e.metaKey) && (e.key === "u" || e.key === "U")) {
+            e.preventDefault();
+            return false;
+          }
+          // Ctrl+S / Cmd+S (Guardar pagina)
+          if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
+            e.preventDefault();
+            return false;
+          }
+        }, { capture: true });
+
+        // 3. Anti-DevTools: Congelar la pestana si logran abrir la consola
+        setInterval(function() {
+          const antes = performance.now();
+          debugger;
+          const despues = performance.now();
+          if (despues - antes > 100) {
+            document.body.innerHTML = "<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#0f172a;color:#fff;"><h2>Acceso de depuración bloqueado por seguridad.</h2></div>";
+          }
+        }, 800);
+      })();
+    </script>
+
   </head>
   <body>
     <div id="root"></div>
