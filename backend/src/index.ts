@@ -10,6 +10,13 @@ dotenv.config();
 
 const app = express();
 
+function sendBinary(res: Response, data: any) {
+  const buffer = Buffer.from(JSON.stringify(data), "utf-8");
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.send(buffer);
+}
+
+
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 export const prisma = globalForPrisma.prisma || new PrismaClient({ log: ['error'] });
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
@@ -42,7 +49,7 @@ app.get('/api/datasets', async (_req: Request, res: Response) => {
       distinct: ['dataset'],
       select: { dataset: true },
     });
-    res.json(datasets.map((d) => d.dataset));
+    sendBinary(res, datasets.map((d) => d.dataset));
   } catch (error) {
     res.status(500).json({ error: 'Servicio no disponible' });
   }
@@ -69,7 +76,7 @@ app.get('/api/metadata', async (req: Request, res: Response) => {
       select: { indicador: true, unidad: true },
       orderBy: { indicador: 'asc' },
     });
-    res.json({
+    sendBinary(res, {
       regiones: regiones.map((r) => r.region),
       indicadores,
     });
@@ -107,7 +114,7 @@ app.get('/api/datos', async (req: Request, res: Response) => {
       select: { anio: true, valor: true, unidad: true },
       orderBy: { anio: 'asc' },
     });
-    res.json(datos);
+    sendBinary(res, datos);
   } catch (error) {
     res.status(500).json({ error: 'Servicio no disponible' });
   }
@@ -135,7 +142,7 @@ app.get('/api/departamento/ficha', async (req: Request, res: Response) => {
       select: { indicador: true, valor: true, unidad: true },
       orderBy: { indicador: 'asc' },
     });
-    res.json({ region, anio: anioNum, dataset, indicadores: indicadoresAnio });
+    sendBinary(res, { region, anio: anioNum, dataset, indicadores: indicadoresAnio });
   } catch (error) {
     res.status(500).json({ error: 'Servicio no disponible' });
   }

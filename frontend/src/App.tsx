@@ -115,7 +115,7 @@ export default function App() {
   // 1. Cargar GeoJSON
   useEffect(() => {
     fetch('/colombia.json')
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => (res.ok ? res.blob().then(b => b.text()).then(t => JSON.parse(t)) : null))
       .then((data) => {
         if (data) setMapGeoData(data);
       })
@@ -125,7 +125,7 @@ export default function App() {
   // 2. Cargar Datasets
   useEffect(() => {
     fetch('/api/datasets')
-      .then((res) => (res.ok ? res.json() : []))
+      .then((res) => (res.ok ? res.blob().then(b => b.text()).then(t => JSON.parse(t)) : []))
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           setDatasets(data);
@@ -139,7 +139,7 @@ export default function App() {
   useEffect(() => {
     if (!datasetSel) return;
     fetch(`/api/metadata?dataset=${datasetSel}`)
-      .then((res) => (res.ok ? res.json() : { regiones: [], indicadores: [] }))
+      .then((res) => (res.ok ? res.blob().then(b => b.text()).then(t => JSON.parse(t)) : { regiones: [], indicadores: [] }))
       .then((data) => {
         const regs: string[] = data.regiones || [];
         const inds: IndicadorMeta[] = data.indicadores || [];
@@ -173,7 +173,7 @@ export default function App() {
       const url = `/api/datos?dataset=${dataset}&region=${encodeURIComponent(region)}&indicador=${encodeURIComponent(indicador)}`;
       const res = await fetch(url);
       if (!res.ok) return [];
-      const data: SerieItem[] = await res.json();
+      const data: SerieItem[] = await res.blob().then(b => b.text()).then(t => JSON.parse(t));
       cacheConsultas.current.set(key, data);
       return data;
     } catch {
@@ -346,7 +346,7 @@ export default function App() {
         `/api/departamento/ficha?dataset=${datasetSel}&region=${encodeURIComponent(nombreDepto)}&anio=${anioMapa}`
       );
       if (!res.ok) throw new Error('Error backend');
-      const data: FichaData = await res.json();
+      const data: FichaData = await res.blob().then(b => b.text()).then(t => JSON.parse(t));
       setFichaModal(data);
     } catch {
       setFichaModal({
