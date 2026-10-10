@@ -8,8 +8,13 @@ import { z } from 'zod';
 dotenv.config();
 
 const app = express();
-const prisma = new PrismaClient();
-const PORT = process.env.PORT || 4000;
+
+// Patrón singleton para Prisma en entornos Serverless
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+export const prisma = globalForPrisma.prisma || new PrismaClient({
+  log: ['error'],
+});
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 app.use(helmet());
 app.use(cors());
@@ -22,8 +27,9 @@ app.get('/api/datasets', async (_req: Request, res: Response) => {
       select: { dataset: true },
     });
     res.json(datasets.map((d) => d.dataset));
-  } catch (error) {
-    res.status(500).json({ error: 'Error al consultar datasets' });
+  } catch (error: any) {
+    console.error('Error en /api/datasets:', error?.message || error);
+    res.status(500).json({ error: 'Error al consultar datasets', detalle: error?.message });
   }
 });
 
@@ -46,8 +52,9 @@ app.get('/api/metadata', async (req: Request, res: Response) => {
       regiones: regiones.map((r) => r.region),
       indicadores,
     });
-  } catch (error) {
-    res.status(500).json({ error: 'Error al consultar metadata' });
+  } catch (error: any) {
+    console.error('Error en /api/metadata:', error?.message || error);
+    res.status(500).json({ error: 'Error al consultar metadata', detalle: error?.message });
   }
 });
 
@@ -80,8 +87,9 @@ app.get('/api/datos', async (req: Request, res: Response) => {
       orderBy: { anio: 'asc' },
     });
     res.json(datos);
-  } catch (error) {
-    res.status(500).json({ error: 'Error al consultar datos' });
+  } catch (error: any) {
+    console.error('Error en /api/datos:', error?.message || error);
+    res.status(500).json({ error: 'Error al consultar datos', detalle: error?.message });
   }
 });
 
@@ -99,8 +107,9 @@ app.get('/api/departamento/ficha', async (req: Request, res: Response) => {
       orderBy: { indicador: 'asc' },
     });
     res.json({ region, anio, dataset, indicadores: indicadoresAnio });
-  } catch (error) {
-    res.status(500).json({ error: 'Error al consultar ficha' });
+  } catch (error: any) {
+    console.error('Error en /api/departamento/ficha:', error?.message || error);
+    res.status(500).json({ error: 'Error al consultar ficha', detalle: error?.message });
   }
 });
 
