@@ -25,6 +25,16 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
+// Middleware de verificación de origen y token interno
+app.use("/api", (req, res, next) => {
+  const token = req.headers["x-observatorio-token"];
+  if (token !== "obs_front_prod_9921_sec") {
+    return res.status(403).json({ error: "Acceso no autorizado fuera de la aplicacion" });
+  }
+  next();
+});
+
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 150, // Máximo 150 peticiones por IP

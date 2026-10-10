@@ -124,7 +124,7 @@ export default function App() {
 
   // 2. Cargar Datasets
   useEffect(() => {
-    fetch('/api/datasets')
+    fetch('/api/, { headers: { 'x-observatorio-token': 'obs_front_prod_9921_sec' }, }datasets')
       .then((res) => (res.ok ? res.blob().then(b => b.text()).then(t => JSON.parse(t)) : []))
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
@@ -171,7 +171,7 @@ export default function App() {
     }
     try {
       const url = `/api/datos?dataset=${dataset}&region=${encodeURIComponent(region)}&indicador=${encodeURIComponent(indicador)}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: { 'x-observatorio-token': 'obs_front_prod_9921_sec' } });
       if (!res.ok) return [];
       const data: SerieItem[] = await res.blob().then(b => b.text()).then(t => JSON.parse(t));
       cacheConsultas.current.set(key, data);
