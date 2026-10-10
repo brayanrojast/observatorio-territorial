@@ -1,3 +1,4 @@
+import rateLimit from 'express-rate-limit';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -16,6 +17,16 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 150, // Máximo 150 peticiones por IP
+  message: { error: "Límite de solicitudes alcanzado. Intente más tarde." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api", apiLimiter);
+
 
 // Filtro anti inyección SQL estricto
 const sqlInjectionPattern = /(\b(SELECT|UNION|INSERT|DELETE|UPDATE|DROP|ALTER|EXEC|TRUNCATE)\b|--|\/\*|\*\/|;)/i;
