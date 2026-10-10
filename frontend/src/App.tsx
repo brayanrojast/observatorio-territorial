@@ -1142,8 +1142,8 @@ export default function App() {
                   style={{ width: '100%', height: '100%', cursor: 'grab' }}
                 >
                   <ZoomableGroup
-                    zoom={zoomPosition.zoom}
-                    center={zoomPosition.coordinates}
+                    zoom={zoomPosition.zoom || 1}
+                    center={zoomPosition.coordinates || [-73.5, 4.2]}
                     onMoveEnd={({ coordinates, zoom }) => setZoomPosition({ coordinates, zoom })}
                   >
                     <Geographies geography={mapGeoData}>
