@@ -1,12 +1,43 @@
+
+```json
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "backend": {
+      "root": "backend",
+      "framework": "express"
+    },
+    "frontend": {
+      "root": "frontend",
+      "framework": "vite"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api"
+      "destination": {
+        "service": "backend"
+      }
     },
     {
       "source": "/(.*)",
-      "destination": "/frontend/dist/$1"
+      "destination": {
+        "service": "frontend"
+      }
     }
   ]
 }
+```
+
+## How Vercel services work
+
+Services let one repository deploy multiple backends and frontends as a single Vercel project, with shared routing, environment variables, and one domain. Each service is built independently, and at request time Vercel routes to a service based on the top-level rewrites.
+
+- Define each service under the top-level `services` key. A service's `root` is its directory relative to the directory containing `vercel.json`; `framework`, `runtime`, `entrypoint`, and `buildCommand` are set per service.
+- A service is **internal by default** and receives no public traffic. It is only reachable from the internet if a top-level rewrite targets it, using the object form: `{ "source": "/api/(.*)", "destination": { "service": "my_backend" } }`.
+- Order rewrites from the most specific path to the least; a catch-all `/(.*)` should come last.
+- In services mode, build and runtime keys (`functions`, `installCommand`, `buildCommand`, `devCommand`, `ignoreCommand`, `outputDirectory`, `framework`) are not valid at the top level and must move into the service they belong to. Public routing keys stay at the top level.
+- `vercel dev` runs all services together locally and injects binding variables. Use this command for testing.
+
+Docs: https://vercel.com/docs/services
+
