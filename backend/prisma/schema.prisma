@@ -1,0 +1,23 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model DatosEconomicos {
+  id          Int      @id @default(autoincrement())
+  dataset     String
+  region      String
+  codigoDane  String?  @map("codigo_dane")
+  anio        Int
+  indicador   String
+  valor       Float?
+  unidad      String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("datos_economicos")
+}
