@@ -13,18 +13,9 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 4000;
 
 app.use(helmet());
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:5174'] }));
+app.use(cors());
 app.use(express.json());
 
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 2000,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api', apiLimiter);
-
-// 1. Datasets
 app.get('/api/datasets', async (_req: Request, res: Response) => {
   try {
     const datasets = await prisma.datosEconomicos.findMany({
@@ -37,7 +28,6 @@ app.get('/api/datasets', async (_req: Request, res: Response) => {
   }
 });
 
-// 2. Metadata
 app.get('/api/metadata', async (req: Request, res: Response) => {
   try {
     const dataset = String(req.query.dataset || 'empleo_geih');
@@ -62,11 +52,12 @@ app.get('/api/metadata', async (req: Request, res: Response) => {
   }
 });
 
-// 3. Datos series históricas
 const DatosQuerySchema = z.object({
   dataset: z.string().min(1),
   region: z.string().min(1),
   indicador: z.string().min(1),
+  anio_inicio: z.string().optional(),
+  anio_fin: z.string().optional(),
 });
 
 app.get('/api/datos', async (req: Request, res: Response) => {
@@ -74,10 +65,18 @@ app.get('/api/datos', async (req: Request, res: Response) => {
   if (!parseResult.success) {
     return res.status(400).json({ error: 'Parámetros inválidos' });
   }
-  const { dataset, region, indicador } = parseResult.data;
+  const { dataset, region, indicador, anio_inicio, anio_fin } = parseResult.data;
+
+  const whereClause: any = { dataset, region, indicador };
+  if (anio_inicio || anio_fin) {
+    whereClause.anio = {};
+    if (anio_inicio) whereClause.anio.gte = parseInt(anio_inicio, 10);
+    if (anio_fin) whereClause.anio.lte = parseInt(anio_fin, 10);
+  }
+
   try {
     const datos = await prisma.datosEconomicos.findMany({
-      where: { dataset, region, indicador },
+      where: whereClause,
       select: { anio: true, valor: true, unidad: true },
       orderBy: { anio: 'asc' },
     });
@@ -87,15 +86,12 @@ app.get('/api/datos', async (req: Request, res: Response) => {
   }
 });
 
-// 4. Ficha Departamental por Año
 app.get('/api/departamento/ficha', async (req: Request, res: Response) => {
   const dataset = String(req.query.dataset || 'empleo_geih');
   const region = String(req.query.region || '');
   const anio = parseInt(String(req.query.anio || '2023'), 10);
 
-  if (!region) {
-    return res.status(400).json({ error: 'Falta el parámetro region' });
-  }
+  if (!region) return res.status(400).json({ error: 'Falta la región' });
 
   try {
     const indicadoresAnio = await prisma.datosEconomicos.findMany({
@@ -103,18 +99,10 @@ app.get('/api/departamento/ficha', async (req: Request, res: Response) => {
       select: { indicador: true, valor: true, unidad: true },
       orderBy: { indicador: 'asc' },
     });
-
-    res.json({
-      region,
-      anio,
-      dataset,
-      indicadores: indicadoresAnio,
-    });
+    res.json({ region, anio, dataset, indicadores: indicadoresAnio });
   } catch (error) {
     res.status(500).json({ error: 'Error al consultar ficha' });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor backend escuchando en http://localhost:${PORT}`);
-});
+export default app;
