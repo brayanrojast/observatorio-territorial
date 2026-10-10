@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
@@ -32,6 +33,15 @@ app.get('/api/datasets', async (_req: Request, res: Response) => {
     res.status(500).json({ error: 'Error al consultar datasets', detalle: error?.message });
   }
 });
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // Máximo 100 peticiones por ventana por IP (mitiga scrapers masivos)
+  message: { error: 'Límite de solicitudes alcanzado. Intente más tarde.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
 
 app.get('/api/metadata', async (req: Request, res: Response) => {
   try {
@@ -93,6 +103,10 @@ app.get('/api/datos', async (req: Request, res: Response) => {
   }
 });
 
+app.use(cors({
+  origin: ['https://obster.carlosgfajardo.com', 'https://observatorio-territorial-c6jj.vercel.app']
+}));
+
 app.get('/api/departamento/ficha', async (req: Request, res: Response) => {
   const dataset = String(req.query.dataset || 'empleo_geih');
   const region = String(req.query.region || '');
@@ -112,5 +126,21 @@ app.get('/api/departamento/ficha', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Error al consultar ficha', detalle: error?.message });
   }
 });
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+      },
+    },
+    frameguard: { action: 'deny' }, // Nadie puede meter tu web en un iframe
+    noSniff: true,
+  })
+);
 
 export default app;
